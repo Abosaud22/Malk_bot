@@ -20,8 +20,6 @@ def get_platform(url):
         return "instagram"
     elif "youtube.com" in url or "youtu.be" in url:
         return "youtube"
-    elif "snapchat.com" in url:
-        return "snapchat"
     elif "x.com" in url or "twitter.com" in url:
         return "twitter"
     return "unknown"
@@ -41,7 +39,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎵 تيك توك\n"
         "📸 إنستقرام\n"
         "▶️ يوتيوب\n"
-        "👻 سناب شات\n"
         "🐦 تويتر\n\n"
         "⛔️ بدون قنوات ولا وجع راس\n"
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
@@ -77,8 +74,6 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if platform == "tiktok":
         await handle_tiktok(context, user_id, url, choice)
-    elif platform == "snapchat":
-        await handle_snapchat(context, user_id, url)
     else:
         await handle_with_ytdlp(context, user_id, url, choice)
 
@@ -146,21 +141,6 @@ async def handle_tiktok(context, user_id, url, choice):
 
     except Exception as e:
         await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ TikTok:\n{str(e)}")
-
-async def handle_snapchat(context, user_id, url):
-    try:
-        api_url = "https://snaptik.ws/api/fetch"
-        res = requests.post(api_url, data={"url": url}).json()
-        video_url = res.get("data", {}).get("video")
-
-        if not video_url:
-            await context.bot.send_message(chat_id=user_id, text="❌ تعذر تحميل الفيديو من سناب.")
-            return
-
-        await context.bot.send_video(chat_id=user_id, video=video_url)
-
-    except Exception as e:
-        await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ Snapchat:\n{str(e)}")
 
 # تشغيل البوت
 app = ApplicationBuilder().token(BOT_TOKEN).build()
