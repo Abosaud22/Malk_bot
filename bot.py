@@ -44,6 +44,7 @@ def get_video_by_yt_dlp(url):
             'format': 'best[ext=mp4]',
             'quiet': True,
             'noplaylist': True,
+            'cookiefile': 'cookies.txt'
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
