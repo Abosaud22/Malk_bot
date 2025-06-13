@@ -5,6 +5,7 @@ import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
+# إعدادات عامة
 os.environ["PYTHONUNBUFFERED"] = "1"
 BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
 CHANNEL_ID = -1002525918633
@@ -61,7 +62,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("⏳ جاري التحميل...")
 
     if platform == "tiktok":
-        await handle_tiktok(context, user_id, url)
+        await handle_tiktok(context, user_id, url, choice)
     else:
         await handle_with_ytdlp(context, user_id, url, choice)
 
@@ -104,14 +105,25 @@ async def handle_with_ytdlp(context, user_id, url, choice):
     except Exception as e:
         await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ:\n{str(e)}")
 
-async def handle_tiktok(context, user_id, url):
+async def handle_tiktok(context, user_id, url, choice):
     try:
         res = requests.get(f"https://tikwm.com/api/?url={url}").json()
-        video_url = res.get("data", {}).get("play")
-        if video_url:
+        data = res.get("data", {})
+
+        if choice == "audio":
+            audio_url = data.get("music")
+            if not audio_url:
+                await context.bot.send_message(chat_id=user_id, text="❌ ما حصلنا الصوت.")
+                return
+            await context.bot.send_audio(chat_id=user_id, audio=audio_url)
+
+        else:  # video
+            video_url = data.get("play")
+            if not video_url:
+                await context.bot.send_message(chat_id=user_id, text="❌ ما حصلنا الفيديو.")
+                return
             await context.bot.send_video(chat_id=user_id, video=video_url)
-        else:
-            await context.bot.send_message(chat_id=user_id, text="❌ فشل تحميل تيك توك.")
+
     except Exception as e:
         await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ TikTok:\n{str(e)}")
 
