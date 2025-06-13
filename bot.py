@@ -5,9 +5,8 @@ import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-# إعدادات عامة
 BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
-CHANNEL_ID = -1002525918633
+CHANNEL_ID = -1002525918633  # تأكد أنه يبدأ بـ -100
 URL_STORE = {}
 
 def clean_url(url):
@@ -90,10 +89,12 @@ async def handle_with_ytdlp(context, user_id, url, choice):
         size = os.path.getsize(file_path)
 
         if size > 52428800:
+            # كبير جدًا، نرسله للقناة
             msg = await context.bot.send_document(chat_id=CHANNEL_ID, document=open(file_path, 'rb'))
             link = f"https://t.me/c/{str(CHANNEL_ID)[4:]}/{msg.message_id}"
             await context.bot.send_message(chat_id=user_id, text=link)
         else:
+            # صغير، نرسله مباشرة
             if choice == "audio":
                 await context.bot.send_audio(chat_id=user_id, audio=open(file_path, 'rb'))
             else:
