@@ -1,55 +1,51 @@
 import os
 import re
+import requests
 import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-# حماية
 os.environ["PYTHONUNBUFFERED"] = "1"
-
 BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
 CHANNEL_ID = -1002525918633
-URL_STORE = {}  # لتخزين الرابط مؤقتًا
+URL_STORE = {}
 
 def clean_url(url):
     return url.split("?")[0]
 
-def is_supported_url(url):
-    return any(x in url for x in ["youtube.com", "youtu.be", "tiktok.com", "instagram.com", "instagr.am"])
+def get_platform(url):
+    if "tiktok.com" in url:
+        return "tiktok"
+    elif "instagram.com" in url or "instagr.am" in url:
+        return "instagram"
+    elif "youtube.com" in url or "youtu.be" in url:
+        return "youtube"
+    return "unknown"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "ارحــبــوه🤝🏼\n\n"
         "بــوت تــحــمــيــل 📥\n\n"
-        "المبرمج💻🇸🇦\n"
-        "أبـو سـⓕ¹⁵ـعـود\n"
-        "Snap: u_h0o\n"
-        "Telegram: @lMIIIIIl\n\n"
-        "مـمـيـزات الـبـوت 🤖\n"
-        "❌ ما يطلب تشترك بقنوات\n"
-        "❌ ما يعطيك روابط كذب ولا إعلانات\n\n"
-        "✅ يدعم:\n"
-        "🎵 تيك توك\n"
-        "📸 إنستقرام\n"
-        "▶️ يوتيوب\n\n"
+        "المبرمج💻🇸🇦 أبـو سـⓕ¹⁵ـعـود\n"
+        "Snap: u_h0o\nTelegram: @lMIIIIIl\n\n"
+        "✅ يدعم:\n🎵 تيك توك\n📸 إنستقرام\n▶️ يوتيوب\n\n"
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
     )
 
 async def ask_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = clean_url(update.message.text.strip())
-    if not is_supported_url(url):
+    platform = get_platform(url)
+    if platform == "unknown":
         await update.message.reply_text("❌ الرابط غير مدعوم.")
         return
 
-    user_id = update.effective_user.id
-    URL_STORE[user_id] = url
+    URL_STORE[update.effective_user.id] = (url, platform)
 
-    keyboard = [
-        [InlineKeyboardButton("🎥 تحميل فيديو", callback_data="video"),
-         InlineKeyboardButton("🎧 تحميل صوت", callback_data="audio")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("اختر التنسيق:", reply_markup=reply_markup)
+    keyboard = [[
+        InlineKeyboardButton("🎥 فيديو", callback_data="video"),
+        InlineKeyboardButton("🎧 صوت", callback_data="audio")
+    ]]
+    await update.message.reply_text("اختر نوع التحميل:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -57,13 +53,19 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = query.data
     user_id = query.from_user.id
 
-    url = URL_STORE.get(user_id)
-    if not url:
-        await query.edit_message_text("❌ لم يتم العثور على رابط. أرسل الرابط من جديد.")
+    if user_id not in URL_STORE:
+        await query.edit_message_text("❌ لم يتم العثور على الرابط.")
         return
 
+    url, platform = URL_STORE[user_id]
     await query.edit_message_text("⏳ جاري التحميل...")
 
+    if platform == "tiktok":
+        await handle_tiktok(context, user_id, url)
+    else:
+        await handle_with_ytdlp(context, user_id, url, choice)
+
+async def handle_with_ytdlp(context, user_id, url, choice):
     try:
         filename = f"file_{user_id}"
         ydl_opts = {
@@ -87,7 +89,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         size = os.path.getsize(file_path)
 
-        if size > 52428800:  # أكبر من 50MB
+        if size > 52428800:
             msg = await context.bot.send_document(chat_id=CHANNEL_ID, document=open(file_path, 'rb'))
             link = f"https://t.me/c/{str(CHANNEL_ID)[4:]}/{msg.message_id}"
             await context.bot.send_message(chat_id=user_id, text=link)
@@ -101,6 +103,17 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ:\n{str(e)}")
+
+async def handle_tiktok(context, user_id, url):
+    try:
+        res = requests.get(f"https://tikwm.com/api/?url={url}").json()
+        video_url = res.get("data", {}).get("play")
+        if video_url:
+            await context.bot.send_video(chat_id=user_id, video=video_url)
+        else:
+            await context.bot.send_message(chat_id=user_id, text="❌ فشل تحميل تيك توك.")
+    except Exception as e:
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ TikTok:\n{str(e)}")
 
 # تشغيل البوت
 app = ApplicationBuilder().token(BOT_TOKEN).build()
