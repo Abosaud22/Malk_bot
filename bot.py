@@ -5,7 +5,7 @@ import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
+BOT_TOKEN = "7632674347:AAFsZlVP3iYQJ8UAXV8NCnj1KcMOCAI6Fj8"
 ADMIN_ID = 1392151842
 CHANNEL_ID = -1002525918633
 URL_STORE = {}
@@ -25,6 +25,7 @@ def get_platform(url):
     return "unknown"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
     await update.message.reply_text(
         "ارحــبــوه 🤝🏼\n\n"
         "بــوت تــحــمــيــل 📥\n\n"
@@ -44,14 +45,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
     )
 
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=f"🆕 مستخدم جديد دخل البوت:\n\n"
+             f"👤 الاسم: {user.full_name}\n"
+             f"🆔 المعرف: {user.id}\n"
+             f"📛 اليوزر: @{user.username if user.username else 'لا يوجد'}"
+    )
+
 async def ask_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = clean_url(update.message.text.strip())
     platform = get_platform(url)
+    user = update.effective_user
+
+    # تنبيه للمطوّر
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=f"📩 رسالة جديدة:\n\n"
+             f"👤 الاسم: {user.full_name}\n"
+             f"🆔 المعرف: {user.id}\n"
+             f"📛 اليوزر: @{user.username if user.username else 'لا يوجد'}\n\n"
+             f"📎 أرسل: {url}"
+    )
+
     if platform == "unknown":
         await update.message.reply_text("❌ الرابط غير مدعوم.")
         return
 
-    URL_STORE[update.effective_user.id] = (url, platform)
+    URL_STORE[user.id] = (url, platform)
 
     keyboard = [[
         InlineKeyboardButton("🎥 فيديو", callback_data="video"),
@@ -142,9 +163,23 @@ async def handle_tiktok(context, user_id, url, choice):
     except Exception as e:
         await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ TikTok:\n{str(e)}")
 
+# أمر رد من المطوّر لأي مستخدم
+async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        args = context.args
+        target_id = int(args[0])
+        message = ' '.join(args[1:])
+        await context.bot.send_message(chat_id=target_id, text=message)
+        await update.message.reply_text("✅ تم إرسال الرد.")
+    except:
+        await update.message.reply_text("❌ الصيغة: /رد [id] [رسالتك]")
+
 # تشغيل البوت
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("رد", admin_reply))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ask_format))
 app.add_handler(CallbackQueryHandler(handle_choice))
 app.run_polling()
