@@ -23,7 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ ما يعطيك روابط كذب ولا إعلانات\n\n"
         "✅ يدعم:\n"
         "🎵 تيك توك (بدون علامة مائية)\n"
-        "📸 إنستقرام (قريبًا)\n"
+        "📸 إنستقرام\n"
         "▶️ يوتيوب\n\n"
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
     )
@@ -37,8 +37,11 @@ async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif "youtube.com" in url or "youtu.be" in url:
         await handle_youtube(update, context, url)
 
+    elif "instagram.com" in url:
+        await handle_instagram(update, context, url)
+
     else:
-        await update.message.reply_text("❌ الرابط غير مدعوم حالياً. أرسل من YouTube أو TikTok فقط.")
+        await update.message.reply_text("❌ الرابط غير مدعوم. أرسل رابط من YouTube أو TikTok أو Instagram فقط.")
 
 async def handle_youtube(update, context, url):
     try:
@@ -74,11 +77,30 @@ async def handle_tiktok(update, context, url):
 
         if response.get("data") and response["data"].get("play"):
             video_url = response["data"]["play"]
-            await update.message.reply_video(video=video_url, caption="🎵 تم التحميل من TikTok بدون علامة مائية")
+            await update.message.reply_video(video=video_url, caption="🎵 TikTok تم التحميل بدون علامة مائية")
         else:
-            await update.message.reply_text("❌ ما قدرنا نحمل الفيديو من TikTok. تأكد من صحة الرابط.")
+            await update.message.reply_text("❌ ما قدرنا نحمل الفيديو من TikTok. تأكد من الرابط.")
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطأ أثناء تحميل التيك توك:\n{str(e)}")
+        await update.message.reply_text(f"⚠️ خطأ TikTok:\n{str(e)}")
+
+async def handle_instagram(update, context, url):
+    try:
+        api_url = "https://igram.io/api/ajax"
+        headers = {
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
+        }
+        data = {"url": url}
+        res = requests.post(api_url, headers=headers, data=data).json()
+
+        if res.get("data") and res["data"].get("medias"):
+            for media in res["data"]["medias"]:
+                media_url = media.get("url")
+                if media_url:
+                    await update.message.reply_video(video=media_url, caption="📸 Instagram تحميل")
+        else:
+            await update.message.reply_text("❌ الرابط غير صالح أو خاص.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطأ Instagram:\n{str(e)}")
 
 # تشغيل البوت
 app = ApplicationBuilder().token(BOT_TOKEN).build()
