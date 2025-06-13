@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
-CHANNEL_ID = -1002525918633  # تأكد أنه يبدأ بـ -100
+CHANNEL_ID = -1002525918633
 URL_STORE = {}
 
 def clean_url(url):
@@ -69,7 +69,7 @@ async def handle_with_ytdlp(context, user_id, url, choice):
         filename = f"file_{user_id}"
         ydl_opts = {
             'outtmpl': f'{filename}.%(ext)s',
-            'format': 'bestaudio/best' if choice == "audio" else 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'bestaudio/best' if choice == "audio" else 'bestvideo+bestaudio/best',
             'cookiefile': 'cookies_instagram.txt' if "instagram.com" in url else 'cookies.txt',
             'postprocessors': []
         }
@@ -83,18 +83,16 @@ async def handle_with_ytdlp(context, user_id, url, choice):
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            ext = "mp3" if choice == "audio" else info['ext']
+            ext = "mp3" if choice == "audio" else info.get("ext", "mp4")
             file_path = f"{filename}.{ext}"
 
         size = os.path.getsize(file_path)
 
         if size > 52428800:
-            # كبير جدًا، نرسله للقناة
             msg = await context.bot.send_document(chat_id=CHANNEL_ID, document=open(file_path, 'rb'))
             link = f"https://t.me/c/{str(CHANNEL_ID)[4:]}/{msg.message_id}"
             await context.bot.send_message(chat_id=user_id, text=link)
         else:
-            # صغير، نرسله مباشرة
             if choice == "audio":
                 await context.bot.send_audio(chat_id=user_id, audio=open(file_path, 'rb'))
             else:
