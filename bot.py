@@ -1,21 +1,21 @@
 import os
 import re
-import requests
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import yt_dlp
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 # حماية
 os.environ["PYTHONUNBUFFERED"] = "1"
 
 BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
 CHANNEL_ID = -1002525918633
+URL_STORE = {}  # لتخزين الرابط مؤقتًا
 
 def clean_url(url):
     return url.split("?")[0]
 
-def is_instagram_url(url):
-    return bool(re.search(r"(instagram\.com|instagr\.am)", url))
+def is_supported_url(url):
+    return any(x in url for x in ["youtube.com", "youtu.be", "tiktok.com", "instagram.com", "instagr.am"])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -29,84 +29,82 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ ما يطلب تشترك بقنوات\n"
         "❌ ما يعطيك روابط كذب ولا إعلانات\n\n"
         "✅ يدعم:\n"
-        "🎵 تيك توك (بدون علامة مائية)\n"
+        "🎵 تيك توك\n"
         "📸 إنستقرام\n"
         "▶️ يوتيوب\n\n"
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
     )
 
-async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ask_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = clean_url(update.message.text.strip())
+    if not is_supported_url(url):
+        await update.message.reply_text("❌ الرابط غير مدعوم.")
+        return
 
-    if "tiktok.com" in url:
-        await handle_tiktok(update, context, url)
+    user_id = update.effective_user.id
+    URL_STORE[user_id] = url
 
-    elif "youtube.com" in url or "youtu.be" in url:
-        await handle_youtube(update, context, url)
+    keyboard = [
+        [InlineKeyboardButton("🎥 تحميل فيديو", callback_data="video"),
+         InlineKeyboardButton("🎧 تحميل صوت", callback_data="audio")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("اختر التنسيق:", reply_markup=reply_markup)
 
-    elif is_instagram_url(url):
-        await handle_instagram(update, context, url)
+async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    choice = query.data
+    user_id = query.from_user.id
 
-    else:
-        await update.message.reply_text("❌ الرابط غير مدعوم حالياً. أرسل من YouTube أو TikTok أو Instagram فقط.")
+    url = URL_STORE.get(user_id)
+    if not url:
+        await query.edit_message_text("❌ لم يتم العثور على رابط. أرسل الرابط من جديد.")
+        return
 
-async def handle_youtube(update, context, url):
+    await query.edit_message_text("⏳ جاري التحميل...")
+
     try:
+        filename = f"file_{user_id}"
         ydl_opts = {
-            'outtmpl': 'video.%(ext)s',
-            'format': 'best[ext=mp4]',
+            'outtmpl': f'{filename}.%(ext)s',
+            'format': 'bestaudio/best' if choice == "audio" else 'bestvideo+bestaudio/best',
             'cookiefile': 'cookies.txt',
+            'postprocessors': []
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        if choice == "audio":
+            ydl_opts['postprocessors'].append({
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            })
 
-        file_path = "video.mp4"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            ext = "mp3" if choice == "audio" else info['ext']
+            file_path = f"{filename}.{ext}"
+
         size = os.path.getsize(file_path)
 
-        if size > 52428800:
-            msg = await context.bot.send_video(chat_id=CHANNEL_ID, video=open(file_path, 'rb'))
+        if size > 52428800:  # أكبر من 50MB
+            msg = await context.bot.send_document(chat_id=CHANNEL_ID, document=open(file_path, 'rb'))
             link = f"https://t.me/c/{str(CHANNEL_ID)[4:]}/{msg.message_id}"
-            await update.message.reply_text(link)
+            await context.bot.send_message(chat_id=user_id, text=link)
         else:
-            await update.message.reply_video(video=open(file_path, 'rb'))
+            if choice == "audio":
+                await context.bot.send_audio(chat_id=user_id, audio=open(file_path, 'rb'))
+            else:
+                await context.bot.send_video(chat_id=user_id, video=open(file_path, 'rb'))
 
         os.remove(file_path)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ خطأ في تحميل YouTube:\n{str(e)}")
-
-async def handle_tiktok(update, context, url):
-    try:
-        api_url = f"https://tikwm.com/api/?url={url}"
-        response = requests.get(api_url).json()
-        if response.get("data") and response["data"].get("play"):
-            video_url = response["data"]["play"]
-            await update.message.reply_video(video=video_url)
-        else:
-            await update.message.reply_text("❌ فشل تحميل TikTok. تأكد من الرابط.")
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطأ TikTok:\n{str(e)}")
-
-async def handle_instagram(update, context, url):
-    try:
-        api_url = "https://igram.io/api/ajax"
-        headers = {"content-type": "application/x-www-form-urlencoded; charset=UTF-8"}
-        data = {"url": url}
-        res = requests.post(api_url, headers=headers, data=data).json()
-
-        if res.get("data") and res["data"].get("medias"):
-            for media in res["data"]["medias"]:
-                media_url = media.get("url")
-                if media_url:
-                    await update.message.reply_video(video=media_url)
-        else:
-            await update.message.reply_text("❌ الرابط غير صالح أو خاص.")
-    except Exception as e:
-        await update.message.reply_text(f"⚠️ خطأ Instagram:\n{str(e)}")
+        await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ:\n{str(e)}")
 
 # تشغيل البوت
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ask_format))
+app.add_handler(CallbackQueryHandler(handle_choice))
 app.run_polling()
