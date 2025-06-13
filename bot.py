@@ -17,17 +17,14 @@ def save_user(user_id, name):
         if os.path.exists(USERS_FILE):
             with open(USERS_FILE, "r") as f:
                 users = json.load(f)
-
         if str(user_id) not in users:
             users[str(user_id)] = name
             with open(USERS_FILE, "w") as f:
                 json.dump(users, f)
-
             requests.post(f"https://api.telegram.org/bot{FORWARD_BOT_TOKEN}/sendMessage", json={
                 "chat_id": FORWARD_CHAT_ID,
                 "text": f"🆕 مستخدم جديد دخل البوت:\n\n👤 {name}\n🆔 {user_id}"
             })
-
     except Exception as e:
         print("User Save Error:", e)
 
@@ -52,13 +49,11 @@ def get_video_by_yt_dlp(url):
             info = ydl.extract_info(url, download=False)
             return info['url']
     except Exception as e:
-        print("Download Error:", e)
-        return None
+        return f"ERROR: {e}"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     save_user(user.id, user.full_name)
-
     msg = (
         "ارحــبــوه🤝🏼\n\n"
         "بــوت تــحــمــيــل 📥\n\n"
@@ -81,7 +76,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-
     url = update.message.text.strip()
     video_url = None
     user = update.effective_user
@@ -101,13 +95,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ الموقع غير مدعوم حالياً.")
         return
 
-    if video_url:
+    if video_url and not video_url.startswith("ERROR:"):
         try:
             await update.message.reply_video(video=video_url)
         except:
             keyboard = [[InlineKeyboardButton("📥 تحميل الفيديو", url=video_url)]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text("اضغط الزر لتحميل الفيديو:", reply_markup=reply_markup)
+    elif video_url and video_url.startswith("ERROR:"):
+        await update.message.reply_text(f"⚠️ خطأ أثناء التحميل:\n{video_url}")
     else:
         await update.message.reply_text("⚠️ تعذر تحميل الفيديو. تأكد من الرابط أو جرب فيديو آخر.")
 
@@ -115,14 +111,11 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         await update.message.reply_text("❌ هذا الأمر مخصص للمشرف فقط.")
         return
-
     if not os.path.exists(USERS_FILE):
         await update.message.reply_text("⚠️ لا يوجد مستخدمين حالياً.")
         return
-
     with open(USERS_FILE, "r") as f:
         users = json.load(f)
-
     msg = "📋 قائمة المستخدمين:\n\n"
     for idx, (uid, name) in enumerate(users.items(), 1):
         msg += f"{idx}. {name} - `{uid}`\n"
