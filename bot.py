@@ -50,7 +50,7 @@ def get_tiktok_video(url):
         print("TikTok Error:", e)
         return None
 
-# Instagram / YouTube
+# yt_dlp لجميع المواقع
 def get_video_by_yt_dlp(url):
     try:
         ydl_opts = {
@@ -84,32 +84,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎵 تيك توك\n"
         "📸 إنستقرام\n"
         "▶️ يوتيوب\n"
-        "✨ وبدون علامة مائية\n\n"
+        "🐦 تويتر\n"
+        "📘 فيسبوك\n"
+        "🎥 فيميو\n"
+        "📺 ديلي موشن\n\n"
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
     )
     await update.message.reply_text(msg)
 
-# handle_message
+# التعامل مع الرسائل
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
-        return  # تجاهل أي شيء ما فيه نص
+        return
 
     url = update.message.text.strip()
     video_url = None
     user = update.effective_user
 
-    # إرسال تنبيه على البوت الثاني حتى لو كان أنت
     requests.post(f"https://api.telegram.org/bot{FORWARD_BOT_TOKEN}/sendMessage", json={
         "chat_id": FORWARD_CHAT_ID,
         "text": f"📩 المستخدم أرسل:\n\n👤 {user.full_name}\n🆔 {user.id}\n🔗 {url}"
     })
 
-    # نوع الرابط
     if "tiktok.com" in url:
         video_url = get_tiktok_video(url)
-    elif "instagram.com" in url or "instagr.am" in url:
-        video_url = get_video_by_yt_dlp(url)
-    elif "youtube.com" in url or "youtu.be" in url:
+    elif any(domain in url for domain in ["instagram.com", "youtu.be", "youtube.com", "x.com", "twitter.com", "facebook.com", "fb.watch", "vimeo.com", "dailymotion.com"]):
         video_url = get_video_by_yt_dlp(url)
     else:
         await update.message.reply_text("❌ الموقع غير مدعوم حالياً.")
