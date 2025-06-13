@@ -5,9 +5,8 @@ import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-# إعدادات
-os.environ["PYTHONUNBUFFERED"] = "1"
-BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
+# إعدادات عامة
+BOT_TOKEN = "توكن_البوت_هنا"
 CHANNEL_ID = -1002525918633
 URL_STORE = {}
 
@@ -72,7 +71,7 @@ async def handle_with_ytdlp(context, user_id, url, choice):
         ydl_opts = {
             'outtmpl': f'{filename}.%(ext)s',
             'format': 'bestaudio/best' if choice == "audio" else 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'cookiefile': 'cookies.txt',
+            'cookiefile': 'cookies_instagram.txt' if "instagram.com" in url else 'cookies.txt',
             'postprocessors': []
         }
 
@@ -116,7 +115,6 @@ async def handle_tiktok(context, user_id, url, choice):
                 await context.bot.send_message(chat_id=user_id, text="❌ ما حصلنا الصوت.")
                 return
             await context.bot.send_audio(chat_id=user_id, audio=audio_url)
-
         else:
             video_url = data.get("play")
             if not video_url:
