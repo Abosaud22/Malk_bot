@@ -1,15 +1,13 @@
 import os
+import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import yt_dlp
 
-# حماية من تعارض النسخ
+# حماية
 os.environ["PYTHONUNBUFFERED"] = "1"
 
-# توكن البوت
 BOT_TOKEN = "7947809298:AAGRitg_EtwO9oXuGlWo8vNLS8L07H9xqHw"
-
-# معرف القناة لرفع المقاطع الكبيرة
 CHANNEL_ID = -1002525918633
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -23,21 +21,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "مـمـيـزات الـبـوت 🤖\n"
         "❌ ما يطلب تشترك بقنوات\n"
         "❌ ما يعطيك روابط كذب ولا إعلانات\n\n"
-        "✅ يدعم المواقع التالية:\n"
-        "🎵 تيك توك\n"
-        "📸 إنستقرام\n"
-        "▶️ يوتيوب\n"
-        "✨ وبدون علامة مائية\n\n"
+        "✅ يدعم:\n"
+        "🎵 تيك توك (بدون علامة مائية)\n"
+        "📸 إنستقرام (قريبًا)\n"
+        "▶️ يوتيوب\n\n"
         "📨 أرسل الرابط، وازهل الباقي 💪🏼"
     )
 
 async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
-    if not ("youtube.com" in url or "youtu.be" in url):
-        await update.message.reply_text("❌ أرسل رابط يوتيوب فقط حالياً.")
-        return
+    if "tiktok.com" in url:
+        await handle_tiktok(update, context, url)
 
+    elif "youtube.com" in url or "youtu.be" in url:
+        await handle_youtube(update, context, url)
+
+    else:
+        await update.message.reply_text("❌ الرابط غير مدعوم حالياً. أرسل من YouTube أو TikTok فقط.")
+
+async def handle_youtube(update, context, url):
     try:
         ydl_opts = {
             'outtmpl': 'video.%(ext)s',
@@ -51,7 +54,7 @@ async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_path = "video.mp4"
         size = os.path.getsize(file_path)
 
-        if size > 52428800:  # إذا الفيديو أكبر من 50MB
+        if size > 52428800:
             await update.message.reply_text("📤 الفيديو كبير، جاري رفعه على القناة...")
             msg = await context.bot.send_video(chat_id=CHANNEL_ID, video=open(file_path, 'rb'))
             link = f"https://t.me/c/{str(CHANNEL_ID)[4:]}/{msg.message_id}"
@@ -62,7 +65,20 @@ async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove(file_path)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ صار خطأ أثناء التحميل:\n\n{str(e)}")
+        await update.message.reply_text(f"⚠️ خطأ أثناء تحميل اليوتيوب:\n{str(e)}")
+
+async def handle_tiktok(update, context, url):
+    try:
+        api_url = f"https://tikwm.com/api/?url={url}"
+        response = requests.get(api_url).json()
+
+        if response.get("data") and response["data"].get("play"):
+            video_url = response["data"]["play"]
+            await update.message.reply_video(video=video_url, caption="🎵 تم التحميل من TikTok بدون علامة مائية")
+        else:
+            await update.message.reply_text("❌ ما قدرنا نحمل الفيديو من TikTok. تأكد من صحة الرابط.")
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ خطأ أثناء تحميل التيك توك:\n{str(e)}")
 
 # تشغيل البوت
 app = ApplicationBuilder().token(BOT_TOKEN).build()
