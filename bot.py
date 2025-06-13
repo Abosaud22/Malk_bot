@@ -98,7 +98,8 @@ async def handle_with_ytdlp(context, user_id, url, choice):
             else:
                 await context.bot.send_video(chat_id=user_id, video=open(file_path, 'rb'))
 
-        os.remove(file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
     except Exception as e:
         await context.bot.send_message(chat_id=user_id, text=f"⚠️ خطأ:\n{str(e)}")
@@ -106,6 +107,10 @@ async def handle_with_ytdlp(context, user_id, url, choice):
 async def handle_tiktok(context, user_id, url, choice):
     try:
         res = requests.get(f"https://tikwm.com/api/?url={url}").json()
+        if not res.get("success", False):
+            await context.bot.send_message(chat_id=user_id, text="❌ تعذر تحميل الفيديو من تيك توك.")
+            return
+
         data = res.get("data", {})
 
         if choice == "audio":
